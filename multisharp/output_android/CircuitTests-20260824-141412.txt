@@ -1,0 +1,81 @@
+device:      samsung SM-A715F
+soc:         QTI SM7150
+android:     13 (API 33)
+abi:         arm64-v8a, armeabi-v7a, armeabi
+max heap:    512 MB
+cores:       8
+policy:      burnInMs=15000 minBlockMs=5000 discardBlocks=1 passes=3
+
+harness: CircuitTests 
+
+Gadgets
+  [ ok ]   multiply evaluates correctly
+  [ ok ]   multiplication CircuitSpec[S=2, U=1, N=1, M=1, E=0] T=1
+  [ ok ]   constant-product node allocates no wire
+  [ ok ]   constant product CircuitSpec[S=1, U=0, N=0, M=1, E=0] T=1
+  [ ok ]   bit decomposition CircuitSpec[S=0, U=2, N=0, M=2, E=1] T=1
+  [ ok ]   product equal to a constant CircuitSpec[S=2, U=0, N=0, M=1, E=0] T=1
+  [ ok ]   a wire that is not a bit is rejected
+  [ ok ]   divideExact evaluates correctly
+  [ ok ]   exact division CircuitSpec[S=2, U=1, N=0, M=1, E=0] T=1
+  [ ok ]   assertNonZero costs two wires, one product and one range proof
+  [ ok ]   non-zero divisor, positive CircuitSpec[S=2, U=2, N=1, M=1, E=0] T=1
+  [ ok ]   divideExact with a negative divisor
+  [ ok ]   non-zero divisor, negative CircuitSpec[S=2, U=3, N=1, M=2, E=0] T=1
+  [ ok ]   a positive divisor costs one range proof and no wire
+  [ ok ]   exact division, divisor proved positive CircuitSpec[S=2, U=1, N=1, M=1, E=0] T=1
+  [ ok ]   a zero form cannot be certified non-zero
+  [ ok ]   divideFloor evaluates correctly
+  [ ok ]   floor division CircuitSpec[S=2, U=3, N=2, M=2, E=0] T=1
+  [ ok ]   divideFloor rounds towards minus infinity
+  [ ok ]   floor division, negative dividend CircuitSpec[S=2, U=3, N=2, M=2, E=0] T=1
+  [ ok ]   sqrtExact evaluates correctly
+  [ ok ]   exact square root CircuitSpec[S=1, U=1, N=1, M=1, E=0] T=1
+  [ ok ]   sqrtFloor evaluates correctly
+  [ ok ]   floor square root CircuitSpec[S=1, U=3, N=2, M=2, E=0] T=1
+  [ ok ]   sqrtFloor is exact on a perfect square
+  [ ok ]   floor square root of a square CircuitSpec[S=1, U=3, N=2, M=2, E=0] T=1
+  [ ok ]   min evaluates correctly
+  [ ok ]   max evaluates correctly
+  [ ok ]   abs evaluates correctly
+  [ ok ]   min/max/abs CircuitSpec[S=2, U=3, N=6, M=3, E=0] T=1
+  [ ok ]   signBit reads the signs
+  [ ok ]   sign bits CircuitSpec[S=3, U=6, N=3, M=6, E=1] T=1
+  [ ok ]   parity assertion CircuitSpec[S=2, U=1, N=1, M=0, E=1] T=0
+  [ ok ]   chained nodes evaluate correctly
+  [ ok ]   composition of depth four CircuitSpec[S=2, U=6, N=5, M=5, E=0] T=7
+  [ ok ]   sqrtExact over a sum of products evaluates correctly
+  [ ok ]   a wide output form is counted in T
+  [ ok ]   exact square root of a sum of products CircuitSpec[S=4, U=5, N=1, M=5, E=0] T=4
+  [ ok ]   a wide dividend is counted in T
+  [ ok ]   exact division by a wide dividend CircuitSpec[S=3, U=3, N=1, M=3, E=0] T=2
+
+Use case I: verifiable locations
+  [ ok ]   reference: (30,40) is inside
+  [ ok ]   reference: (70,70) is outside
+  [ ok ]   reference: (70,30) is inside
+  [ ok ]   S = 2 regardless of the number of edges
+  [ ok ]   U = 4n+1, N = 3n+1, M = 4n, E = 1
+  [ ok ]   T = 1
+  [ ok ]   point inside the polygon CircuitSpec[S=2, U=25, N=19, M=24, E=1] T=1
+  [ ok ]   transcript carries 8 group elements for a 6-edge polygon
+  [ ok ]   a second interior point CircuitSpec[S=2, U=25, N=19, M=24, E=1] T=1
+  [ ok ]   an exterior point has no parity witness
+  [ ok ]   reference: centre is inside the 24-gon
+  [ ok ]   24-edge polygon CircuitSpec[S=2, U=97, N=73, M=96, E=1] T=1
+  [ ok ]   24-edge polygon still carries 8 group elements
+  [ ok ]   scalars grow, commitments do not
+
+Use case II: verifiable biometrics
+  [ ok ]   S = 2n for every metric
+  [ ok ]   Manhattan distance at the threshold CircuitSpec[S=16, U=8, N=17, M=8, E=0] T=1
+  [ ok ]   Manhattan distance below the threshold CircuitSpec[S=16, U=8, N=17, M=8, E=0] T=1
+  [ ok ]   Euclidean distance at the threshold CircuitSpec[S=16, U=11, N=3, M=10, E=0] T=9
+  [ ok ]   Chebyshev distance at the threshold CircuitSpec[S=16, U=15, N=31, M=15, E=0] T=1
+  [ ok ]   a distance above the threshold has no witness
+  [ ok ]   Manhattan has T = 1
+  [ ok ]   Chebyshev has T = 1
+  [ ok ]   Euclidean has T = n+1
+  [ ok ]   a larger T costs bits of L
+
+passed: 64, failed: 0

@@ -1,0 +1,38 @@
+device:      samsung SM-A715F
+soc:         QTI SM7150
+android:     13 (API 33)
+abi:         arm64-v8a, armeabi-v7a, armeabi
+max heap:    512 MB
+cores:       8
+policy:      burnInMs=15000 minBlockMs=5000 discardBlocks=1 passes=3
+
+harness: MultiSharpTests 
+
+MultiSharp tests (CircuitSpec[S=4, U=20, N=8, M=4, E=0], R=16, T=1)
+  L                       = 30076996146000563943129221559434696659
+  zeta window             = [49152, 30076996146000563943129221559434696659]
+  [ ok ] parameter constraint 4(T+1)*W3^2 < p
+  [ ok ] acceptance window is non-empty
+  [ ok ] empty acceptance window is reported
+  [ ok ] honest proof verifies
+  [ ok ] commitment count = 6+S
+  [ ok ] scalar count = 3+3R+3N+2S+U+E
+  [ ok ] commitment count does not grow with the circuit
+  [ ok ] first-phase rejection did not fire for an honest witness
+  [ ok ] every zeta_k lies in the acceptance window
+  [ ok ] proof rejected when zeta_0 falls below the window
+  [ ok ] proof rejected when C_{x,0} commits to a different value
+  [ ok ] proof rejected when value is moved between C_{x,0} and C_{x,1}
+  [ ok ] proof rejected when a wire response is altered
+  [ ok ] proof rejected when zeta_0 is altered
+  [ ok ] proof rejected when zeta_0 leaves the window
+  [ ok ] proof rejected when a product wire is off by one
+  [ ok ] proof rejected when a multiplication input is a large residue
+  [ ok ] proof rejected under a different statement (challenge is bound to it)
+  [ ok ] a different circuit of the same shape is rejected
+  [ ok ] linear assertion: honest proof verifies
+  [ ok ] linear assertion costs one scalar and no commitment
+  [ ok ] linear assertion: proof rejected when eta_0 is altered
+  [ ok ] linear assertion: proof rejected when the relation does not hold
+
+passed: 23, failed: 0

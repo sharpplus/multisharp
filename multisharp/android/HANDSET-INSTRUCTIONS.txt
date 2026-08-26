@@ -1,0 +1,375 @@
+================================================================================
+PRODUCING THE HANDSET RESULTS FOR THE MULTISHARP PAPER
+================================================================================
+
+Written 2026-08-24. Self-contained: everything needed is in this file, the
+android/ module beside it, and the source tree two levels up.
+
+This is the long version. app/open_science.tex in the paper carries a short
+description of the module for reviewers; this file is the working procedure.
+
+Goal: replace the extrapolated handset figure in the paper with a measured one.
+The paper currently asserts handset measurements that DO NOT EXIST. They appear
+as red bracketed placeholders such as [device] and [p16]. Section 8 below maps
+each one to the measurement that fills it.
+
+--------------------------------------------------------------------------------
+0. WHAT IS ALREADY DONE
+--------------------------------------------------------------------------------
+
+Do not redo any of this.
+
+  * The four source patches that make the tree build for Android are applied and
+    verified: srcs.txt fixed, SHA3 taken from keccakj instead of the JCA,
+    util.Compat.nextLong replacing Random.nextLong(bound), and SquareDecomp
+    reading through a pluggable PrecompSource with a static cache.
+  * The Gradle module in android/ is written but HAS NEVER BEEN COMPILED. There
+    is no Android SDK on the machine it was written on. Expect Android Studio to
+    surface something on first sync. This is the single biggest unknown.
+  * The desktop reference numbers in Table 3 of the paper were regenerated on
+    2026-08-24 from the current tree.
+  * Dead code has been pruned (99 -> 62 source files). Every class the Android
+    driver references still exists; this was checked after the pruning.
+
+--------------------------------------------------------------------------------
+1. PREREQUISITES
+--------------------------------------------------------------------------------
+
+  * Android Studio. It supplies the Android SDK and adb, neither of which is
+    otherwise present. Nothing else needs installing.
+  * A phone running Android 12 (API 31) or later. The floor is 31 and is forced
+    by BigInteger.TWO in MultiSharpProver. If you must go lower, replace it with
+    BigInteger.valueOf(2) in MultiSharpProver and MultiSharpParams and drop
+    minSdk to 26; nothing else in the tree needs a library API above Java 11.
+  * USB debugging enabled on the phone: Settings > About phone > tap Build
+    number seven times, then Settings > System > Developer options > USB
+    debugging.
+  * A cable that carries data, not only power.
+  * Roughly 100 MB free on the phone and a couple of hours of its time.
+
+--------------------------------------------------------------------------------
+2. BUILD AND INSTALL
+--------------------------------------------------------------------------------
+
+Open the folder
+
+    C:\Users\Admin\Documents\Claude\sharpstandalone\android
+
+as a project in Android Studio (File > Open, select that directory, not the
+parent). It will offer to create the Gradle wrapper; accept. There is no
+wrapper JAR in the tree.
+
+Then, from a terminal in that directory:
+
+    gradlew.bat :app:installRelease
+
+BUILD RELEASE, NOT DEBUG. A debuggable process runs with the JIT held back and
+will read dramatically slow. This is the easiest mistake to make and the hardest
+to notice, because the numbers still look plausible, just uniformly bad.
+
+Confirm what got installed:
+
+    adb shell dumpsys package org.multisharp.bench | findstr versionName
+
+--------------------------------------------------------------------------------
+3. SMOKE TEST: DOES THE PROTOCOL WORK ON ART AT ALL
+--------------------------------------------------------------------------------
+
+Launch the app. Six buttons, one per harness. Tap to run with the arguments
+shown; long-press to load those arguments into the edit box and read a
+description.
+
+Run these two first, in this order. Both take seconds.
+
+    MultiSharpTests      expect: passed: 23, failed: 0
+    CircuitTests         expect: passed: 64, failed: 0
+
+If either fails, stop. The likely causes, in order:
+
+  (a) "cannot read the precomputed two-square table decomps2.txt" - the Gradle
+      copyPrecomp task did not stage the asset. See section 9.
+  (b) A crash inside SHA3 or the transcript - the keccakj substitution did not
+      take. Check that Transcript.java and PedersenCommitment.java construct
+      new SHA3_512() and do not call MessageDigest.getInstance.
+  (c) Anything else - capture it with:  adb logcat -d > crash.txt
+
+Do not proceed to timing until both suites pass. A wrong answer measured
+precisely is worse than no measurement.
+
+--------------------------------------------------------------------------------
+4. CALIBRATE THE TIMING POLICY  (do not skip)
+--------------------------------------------------------------------------------
+
+This is the step that makes the numbers defensible, and the one most likely to
+be skipped because it looks optional. It is not.
+
+experiments.Timing is tuned to a pathology of the DESKTOP JVM, documented at
+length in its class comment: a freshly started HotSpot process runs about 15%
+FASTER than its own steady state for the first several seconds. The burn-in and
+the discarded block exist to absorb that. ART is a different runtime - different
+JIT, different GC, AOT-compiled baseline profiles - and a phone additionally
+throttles as it warms. The desktop transient may be absent on your device,
+larger, or of the opposite sign. You cannot assume it carries over.
+
+Run:
+
+    TimingProbe   solo 256 256 10 3
+
+It prints three consecutive timed blocks. Read them:
+
+  * All three within a couple of percent -> the process settles quickly. The
+    defaults are fine. Record that you checked.
+  * Block 1 fast, blocks 2 and 3 agreeing -> same transient as the desktop.
+    Defaults are fine, the discarded block is doing its job.
+  * Blocks getting steadily SLOWER -> thermal throttling. Raise burnInMs so the
+    device reaches a steady thermal state before anything is reported, and say
+    so in the paper.
+  * Blocks scattered with no pattern -> the block floor is too short for this
+    device. Raise minBlockMs.
+
+To change the policy, edit these four fields near the top of
+
+    android/app/src/main/java/org/multisharp/bench/Bench.kt
+
+        var burnInMs    = 15_000L      (desktop uses 6_000)
+        var minBlockMs  =  5_000L      (desktop uses 3_000)
+        var discardBlocks = 1
+        var passes        = 3
+
+then rebuild and reinstall. They reach the harnesses as system properties,
+applied in Bench.applyTimingPolicy(), which is called from onCreate BEFORE any
+class in experiments is loaded. That ordering is load-bearing: Timing's fields
+and CombinedTables.PASSES are static final and read their properties once, at
+class-initialisation. A property set later is ignored in silence.
+
+Re-run TimingProbe until the blocks agree. WRITE DOWN the values you settle on.
+They go in the paper (placeholder [policy]).
+
+--------------------------------------------------------------------------------
+5. CONDITIONS FOR THE MEASUREMENT RUNS
+--------------------------------------------------------------------------------
+
+Every one of these matters. The desktop half of this project produced 40%
+swings from environmental effects before they were controlled; a phone is worse,
+not better.
+
+  * Plug the phone into mains, not a laptop USB port.
+  * Airplane mode on. Radios wake the CPU.
+  * Screen on and staying on. The activity holds FLAG_KEEP_SCREEN_ON, but check
+    the phone is not force-dimming.
+  * The app in the FOREGROUND for the whole run. Do not switch away. Android
+    demotes background processes to the little cores.
+  * Do not touch the phone while a run is in progress.
+  * Between runs, let the device cool for a few minutes. Back-to-back heavy runs
+    measure the thermal envelope, not the protocol.
+  * Note whether the app reported "sustained performance mode: on" at startup.
+    If it says NOT SUPPORTED, expect drift across a long run and say so in the
+    paper.
+
+The app prints the device, SoC, Android version, ABI, granted heap and core
+count at the top of every output file. That is deliberate - it is the provenance
+you will need in section 8.
+
+--------------------------------------------------------------------------------
+6. THE MEASUREMENT RUNS
+--------------------------------------------------------------------------------
+
+In this order.
+
+  6a. CircuitWorkloads   measure 256 10          THE ONE THAT MATTERS
+      About 4 minutes on the desktop; budget 20-40 on a phone.
+      Produces all thirteen rows of Table 3 - the polygon and biometric
+      circuits. Everything the paper's latency argument rests on comes from
+      here. If you do only one run, do this one.
+
+      Run it THREE TIMES, cooling between. On the desktop three separate
+      invocations agree to 1.6%; you need the phone's equivalent figure to know
+      whether a single run is trustworthy. Report the median.
+
+  6b. CombinedTables   10 1024 256 128,256,512,1024 11        OPTIONAL
+      17 minutes on the desktop; expect a few hours on a phone. Produces
+      Table 2 and the scalability tables. Only worth doing if you want a full
+      handset column rather than the circuit workloads. Start it and leave the
+      phone overnight, plugged in.
+
+  6c. MsmComparison   10 1024 128,256,512,1024                OPTIONAL
+      27 minutes on the desktop. Only if you want to confirm the bucket-method
+      advantage holds on ARM, which is a genuinely interesting question but not
+      one the paper currently asks.
+
+--------------------------------------------------------------------------------
+7. THE DESKTOP CONTROL RUN  (same day, not before)
+--------------------------------------------------------------------------------
+
+The handset number is meaningless on its own; what the paper reports is a
+RATIO against the desktop. Desktop timings on this machine moved by a factor of
+1.35 to 1.55 between 15 August and 24 August on identical code, purely from
+machine state. A stale desktop column would put that entire error straight into
+the handset ratio.
+
+So on the same day as the phone runs, with the machine idle and the benchmark
+window in the FOREGROUND and untouched:
+
+    cd C:\Users\Admin\Documents\Claude\sharpstandalone
+    javac -d build -cp "lib/*" @srcs.txt
+    java -cp "build;lib/*" experiments.CircuitWorkloads measure 256 10
+
+Run it three times and take the median, exactly as for the phone.
+
+For reference, the mean of three quiet runs on 2026-08-24 was, in milliseconds,
+generation and verification:
+
+    Polygon    n=8      15.4    9.8
+    Polygon    n=16     20.0   12.8      <-- the row the paper's argument uses
+    Polygon    n=32     28.7   18.5
+    Polygon    n=64     45.2   29.1
+    Manhattan  n=32     39.8   29.0
+    Manhattan  n=64     68.8   51.2
+    Manhattan  n=128   125.7   95.1
+    Euclidean  n=32     33.6   24.9
+    Euclidean  n=64     57.5   43.0
+    Euclidean  n=128   105.2   78.9
+    Chebyshev  n=32     47.1   34.2
+    Chebyshev  n=64     83.3   61.2
+    Chebyshev  n=128   154.2  115.0
+
+If your fresh desktop run lands within a couple of percent of these, the machine
+is in the same state and Table 3 as printed is still good. If it does not, use
+YOUR fresh numbers for the ratio and consider reprinting Table 3.
+
+--------------------------------------------------------------------------------
+8. RETRIEVING RESULTS AND FILLING THE PAPER
+--------------------------------------------------------------------------------
+
+Pull everything off the phone:
+
+    adb pull /sdcard/Android/data/org.multisharp.bench/files/ ./handset-results
+
+Each file is named <Harness>-<timestamp>.txt and begins with the device
+provenance block.
+
+Now fill the placeholders. Every one renders red and bracketed in the PDF, so
+none can be missed; grep the sources for  \ph{  to list them.
+
+  sec/experiments.tex line 30  (Section 6.1, Measurement)
+    [device]   manufacturer and model, from the output file header
+    [version]  Android release number, from the same header
+    [heap]     "max heap" line of the header, in MB
+    [policy]   the four values you settled on in section 4, e.g.
+               "a 30 s burn-in, a 10 s block floor, one discarded block and
+                three passes"
+
+  sec/experiments.tex line 70  (Section 6.2, close of Comparison)
+    [p16]      handset generation time, Polygon n=16, in ms
+    [f16]      [p16] divided by the desktop Polygon n=16 generation time
+    [comfortably inside]   NOT A NUMBER. This is a qualitative claim about the
+               1.5-2 second biometric budget from lien2023challenges. If [p16]
+               is comfortably below that, fill it as written. If it is not, the
+               SENTENCE must be rewritten, and so must the abstract, which
+               asserts the handset setting as the motivation for the whole
+               paper. Do not simply drop a number in here.
+
+  sec/experiments.tex line 127 (Section 6.3, On a Handset)
+    [p16] [f16]  as above, same quantities, same values
+    [p64]      handset generation time, Polygon n=64, in ms
+    [f64]      [p64] divided by the desktop Polygon n=64 generation time
+    [cheb]     handset generation time, Chebyshev n=128, in ms
+    [pct]      handset verification as a percentage of handset generation,
+               averaged across the four families. On the desktop this is a flat
+               64% on the polygon rows and 72-77% on the biometric ones. If the
+               phone splits it differently, that is a more interesting result
+               than the number itself and the sentence should say so.
+
+  sec/experiments.tex line 134 (Section 6.3, closing)
+    [f16]      as above
+
+There is also a comment block in that paragraph noting that if the handset
+factor turns out roughly uniform across the four families you should say so and
+drop the per-family numbers, whereas if it varies the spread is the more
+interesting finding and deserves the paragraph instead.
+
+Finally, delete the "% TODO(handset)" comment at the top of sec/experiments.tex
+once the placeholders are gone, and rebuild:
+
+    cd C:\Users\Admin\Documents\Claude\2025_improved_sharp\usenix_2027
+    pdflatex main.tex && pdflatex main.tex
+
+Then grep the sources once more for  \ph{  to confirm none survive.
+
+--------------------------------------------------------------------------------
+9. TROUBLESHOOTING
+--------------------------------------------------------------------------------
+
+"cannot read the precomputed two-square table decomps2.txt"
+    The copyPrecomp Gradle task did not stage the asset into the APK. It copies
+    ../precomp/decomps2.txt into build/generated/precompAssets/precomp/ and is
+    wired both through assets.srcDir and through a preBuild dependency, but AGP
+    versions differ in whether that reaches mergeAssets. Check the APK:
+        unzip -l app/build/outputs/apk/release/app-release.apk | findstr decomps2
+    If absent, run  gradlew.bat :app:copyPrecomp  explicitly, then rebuild.
+    As a fallback, copy the file by hand to
+        android/app/src/main/assets/precomp/decomps2.txt
+    which the default asset source set picks up with no task involved.
+
+D8 error mentioning module-info.class
+    curve25519-elisabeth is a modular JAR. app/build.gradle.kts already excludes
+    META-INF/versions/9/module-info.class from packaging; if your AGP complains
+    about a bare module-info.class, add that to the same excludes block.
+
+Gradle sync fails on the plugin versions
+    android/build.gradle.kts pins AGP 8.7.3 and Kotlin 2.0.21. If Studio wants
+    newer, let it upgrade. Nothing in the module uses anything version-sensitive.
+
+Kotlin compile errors
+    Expected. Bench.kt and BenchActivity.kt have never been compiled. They are
+    about 350 lines between them and use no libraries beyond the Android
+    framework and kotlin stdlib, so anything wrong should be local and obvious.
+
+The app dies partway through a long run
+    Almost certainly the system reclaiming memory. android:largeHeap="true" is
+    already set. Confirm the granted heap in the output header; if it is under
+    about 200 MB, run CircuitWorkloads only and skip CombinedTables.
+
+Numbers look implausibly slow
+    Check you installed the RELEASE variant, not debug. This is the most common
+    cause by a wide margin.
+
+--------------------------------------------------------------------------------
+10. WHAT NOT TO DO
+--------------------------------------------------------------------------------
+
+  * Do not report numbers obtained through  adb shell dalvikvm.  That path is
+    documented in android/README.md and is genuinely useful for checking that
+    something RUNS, but a shell-spawned process lands in the background cgroup
+    on most devices and is held to the little cores. Those numbers measure the
+    Android scheduler, not the protocol.
+
+  * Do not benchmark the debug build.
+
+  * Do not carry the desktop timing policy over unexamined. See section 4.
+
+  * Do not compare the handset against a desktop run from a different day. See
+    section 7.
+
+  * Do not fill [comfortably inside] with a number. See section 8.
+
+  * Do not let the phone screen turn off or the app go to the background
+    mid-run, and discard any run during which it did.
+
+--------------------------------------------------------------------------------
+11. IF YOU ONLY HAVE AN HOUR
+--------------------------------------------------------------------------------
+
+  1. Build release, install                                    ~15 min
+  2. MultiSharpTests and CircuitTests                          ~1 min
+  3. TimingProbe solo 256 256 10 3, adjust if needed           ~10 min
+  4. CircuitWorkloads measure 256 10, once                     ~30 min
+  5. Desktop CircuitWorkloads measure 256 10, once             ~5 min
+
+That yields [device], [version], [heap], [policy], [p16], [f16], [p64], [f64],
+[cheb] and [pct] - every placeholder in the paper - from a single phone run.
+The three-run median of section 6a is better and is what should appear in the
+final version, but one run is enough to know whether the story holds and whether
+[comfortably inside] survives.
+
+================================================================================

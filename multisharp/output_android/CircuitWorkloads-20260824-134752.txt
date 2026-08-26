@@ -1,0 +1,38 @@
+device:      samsung SM-A715F
+soc:         QTI SM7150
+android:     13 (API 33)
+abi:         arm64-v8a, armeabi-v7a, armeabi
+max heap:    512 MB
+cores:       8
+policy:      burnInMs=15000 minBlockMs=5000 discardBlocks=1 passes=3
+
+harness: CircuitWorkloads measure 256 10
+
+Circuit dimensions and transcript composition, R=256; timings are the median of 3 passes
+B = 16384 (smallest power of two bounding every covered form, the largest of which is 9315)
+Columns: n, S, U, N, M, E | per-value elem, scal, kB | MultiSharp elem, scal, kB | gen ms, vrf ms
+
+burn-in: 19.0 s over 2 iterations; timings follow
+% pass 1 of 3
+% pass 2 of 3
+% pass 3 of 3
+
+% Polygon
+ & 8   & 2   & 33  & 25  & 32  & 1 & 72   & 916  & 30.9  & \textbf{8  } & 884  & \textbf{27.9} & 176.5 & 113.0 \\
+ & 16  & 2   & 65  & 49  & 64  & 1 & 136  & 1052 & 37.1  & \textbf{8  } & 988  & \textbf{31.1} & 225.8 & 145.4 \\
+ & 32  & 2   & 129 & 97  & 128 & 1 & 264  & 1324 & 49.6  & \textbf{8  } & 1196 & \textbf{37.6} & 318.0 & 207.1 \\
+ & 64  & 2   & 257 & 193 & 256 & 1 & 520  & 1868 & 74.6  & \textbf{8  } & 1612 & \textbf{50.6} & 487.9 & 314.8 \\
+% Manhattan
+ & 32  & 64  & 32  & 65  & 32  & 0 & 132  & 1157 & 40.3  & \textbf{70 } & 1126 & \textbf{37.4} & 462.6 & 337.1 \\
+ & 64  & 128 & 64  & 129 & 64  & 0 & 260  & 1541 & 56.3  & \textbf{134} & 1478 & \textbf{50.4} & 795.2 & 591.9 \\
+ & 128 & 256 & 128 & 257 & 128 & 0 & 516  & 2309 & 88.3  & \textbf{262} & 2182 & \textbf{76.4} & 1456.3 & 1102.2 \\
+% Euclidean
+ & 32  & 64  & 35  & 3   & 34  & 0 & 138  & 977  & 34.8  & \textbf{70 } & 943  & \textbf{31.7} & 399.6 & 294.5 \\
+ & 64  & 128 & 67  & 3   & 66  & 0 & 266  & 1169 & 44.8  & \textbf{134} & 1103 & \textbf{38.7} & 678.0 & 507.1 \\
+ & 128 & 256 & 131 & 3   & 130 & 0 & 522  & 1553 & 64.8  & \textbf{262} & 1423 & \textbf{52.7} & 1242.5 & 942.1 \\
+% Chebyshev
+ & 32  & 64  & 63  & 127 & 63  & 0 & 194  & 1405 & 50.0  & \textbf{70 } & 1343 & \textbf{44.2} & 533.7 & 391.1 \\
+ & 64  & 128 & 127 & 255 & 127 & 0 & 386  & 2045 & 76.0  & \textbf{134} & 1919 & \textbf{64.2} & 939.4 & 698.3 \\
+ & 128 & 256 & 255 & 511 & 255 & 0 & 770  & 3325 & 128.0 & \textbf{262} & 3071 & \textbf{104.2} & 1736.3 & 1302.0 \\
+
+closed forms agree with the compiler on every row

@@ -1,0 +1,14 @@
+device:      samsung SM-A715F
+soc:         QTI SM7150
+android:     13 (API 33)
+abi:         arm64-v8a, armeabi-v7a, armeabi
+max heap:    512 MB
+cores:       8
+policy:      burnInMs=15000 minBlockMs=5000 discardBlocks=1 passes=3
+
+harness: TimingProbe solo 256 256 10 3
+
+TimingProbe mode=solo N=M=256 R=256 reps=10 blocks=3
+  block 1: gen=  683.4 ms (+-5.2)  vrf=  451.8 ms (+-3.8)
+  block 2: gen=  689.3 ms (+-16.1)  vrf=  453.5 ms (+-6.9)
+  block 3: gen=  682.1 ms (+-5.0)  vrf=  450.9 ms (+-3.7)
